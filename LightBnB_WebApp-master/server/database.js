@@ -100,7 +100,6 @@ const getAllProperties = function (options, limit = 10) {
 
   // 1 - array to hold parameters for the query
   const queryParams = [];
-  const useAND = false;
   // 2 - start with all information before WHERE clause
   let queryString = `
     SELECT properties.*, avg(property_reviews.rating) as average_rating
@@ -112,35 +111,30 @@ const getAllProperties = function (options, limit = 10) {
   if (options.city) {
     queryParams.push(`%${options.city}%`);
     queryString += `WHERE city LIKE $${queryParams.length} `;
-    useAND = true;
   }
   if (options.owner_id) {
     queryParams.push(`%${options.owner_id}%`);
-    useAND ? queryString += ' AND ' : queryString += ' WHERE ';
-    queryString += `owner_id = $${queryParams.length} `;
-    useAND = true;
+    queryString += `AND owner_id = $${queryParams.length} `;
   }
   if (options.minimum_price_per_night && options.maximum_price_per_night) {
     queryParams.push(`%${options.minimum_price_per_night}%`);
+    queryString += `AND cost_per_night >= $${queryParams.length}`;
     queryParams.push(`%${options.maximum_price_per_night}%`);
-    useAND ? queryString += ' AND ' : queryString += ' WHERE ';
-    queryString += `BETWEEN $${queryParams.length - 1} AND $${queryParams.length}`;
-    useAND = true;
-  }
-  if (options.minimum_rating) {
-    queryParams.push(`%${options.rating}%`);
-    useAND ? queryString += ' AND ' : queryString += ' WHERE ';
-    queryString += `rating >= $${queryParams.length} `;
-    useAND = true;
+    queryString += `AND cost_per_night <= $${queryParams.length}`;
   }
 
   // 4 - add any query that comes after WHERE clause
+  queryString += `
+  GROUP BY properties.id`;
+  if(options.minimum_rating) {
+    queryParams.push(parseInt(options.minimum_rating));
+    queryString += `HAVING avg(rating) >= $${queryParams.length}`;
+  }
   queryParams.push(limit);
   queryString += `
-    GROUP BY properties.id
-    ORDER BY cost_per_night
-    LIMIT $${queryParams.length};
-    `;
+  ORDER BY cost_per_night
+  LIMIT $${queryParams.length};
+  `;
 
   // 5
   console.log(queryString, queryParams);
